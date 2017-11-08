@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 from socket import *
 import sys
+import subprocess
 
 #verifica se os argumentos foram passados corretamente
 if len(sys.argv) != 3 or sys.argv[1] != "--port":
-	print("Uso: python daemon.py --port PORT")
+	print("Uso: ./daemon.py --port PORT")
 else:
 	port = int(sys.argv[2])
 	print("Porta selecionada: " + str(port))
@@ -23,9 +24,20 @@ else:
 		
 		#recebe e decodifica o pacote
 		package = connectionSocket.recv(2048).decode()
-
-		#exibe o conteudo recebido e encerra a conexao
 		print("Pacote recebido: " + package)
-		connectionSocket.close()
 		
+		#tenta executar o comando e obter seu output
+		output = ""
+		try:
+			output = subprocess.check_output(package.split(" "),
+					stderr=subprocess.STDOUT)
+		except subprocess.CalledProcessError as e:
+			output = e.output
+
+		print("Output: " + output)		
 	
+		#retorna para o socket cliente o output do comando
+		#apos isso, encerra a conexao
+		connectionSocket.send(output.encode())
+		connectionSocket.close()
+
