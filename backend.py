@@ -9,13 +9,21 @@ daemons = {
 }
 
 def executeCommands(commands, num):
-	if len(commands) > 0:
+
+	outputs = []
+
+	for c in commands:
 
 		#cria o socket cliente para enviar o pacote para o daemon
 		#utilizando o protocolo TCP na camada de transporte
 		clientSocket = socket(AF_INET, SOCK_STREAM)
 		clientSocket.connect((daemons["ip"][num], daemons["porta"][num]))
 
-		#envia o pacote para o daemon
-		clientSocket.send(str(commands).encode())
+		#envia o pacote para o daemon e aguarda o retorno
+		clientSocket.send(c.encode())
+		o = clientSocket.recv(2048).decode()
+		outputs.append(o)
+
 		clientSocket.close()
+
+	return outputs
