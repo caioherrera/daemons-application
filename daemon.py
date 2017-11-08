@@ -25,14 +25,20 @@ else:
 		#recebe e decodifica o pacote
 		package = connectionSocket.recv(2048).decode()
 		print("Pacote recebido: " + package)
-		
-		#tenta executar o comando e obter seu output
+
+		#verifica se e seguro executar o comando
 		output = ""
-		try:
-			output = subprocess.check_output(package.split(" "),
-					stderr=subprocess.STDOUT)
-		except subprocess.CalledProcessError as e:
-			output = e.output
+		dangerous = set(";>|")
+		if any((c in dangerous) for c in package):
+			output = "Erro: parametro malicioso!"
+		else:
+		
+			#tenta executar o comando e obter seu output
+			try:
+				output = subprocess.check_output(package.split(" "),
+						stderr=subprocess.STDOUT)
+			except subprocess.CalledProcessError as e:
+				output = e.output
 
 		print("Output: " + output)		
 	
