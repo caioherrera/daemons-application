@@ -34,25 +34,34 @@ def createPackage(prt, opt, num, src, dst):
 	pkg = io.BytesIO()
 
 	#primeira word do cabecalho: version, IHL, Type of Service e Total Length
-	word = (2 << 28) | (wordLen << 24) | (wordLen * 4)
-	pkg.write(struct.pack("I", word))
+	pkg.write(struct.pack("B", (2 << 4 | wordLen))
+	pkg.write(struct.pack("B", 0)
+	pkg.write(struct.pack("H", wordLen * 4))
 
 	#segunda word do cabecalho: identification, flags, fragment offset
-	word = (daemons["seq"][num] << 16) | (7 << 13)
-	pkg.write(struct.pack("I", word))
+	pkg.write(struct.pack("H", daemons["seq"][num]))
+	pkg.write(struct.pack("H", 7 << 13))
 
 	#terceira word do cabecalho: timeToLive, protocol, headerChecksum iniciado com 0
-	word = (64 << 24) | (prt << 16) | computeChecksum()
-	pkg.write(struct.pack("I", word))
+	pkg.write(struct.pack("B", 64))
+	pkg.write(struct.pack("B", prt))
+	pkg.write(struct.pack("H", computeChecksum())
 
 	#quarta e quinta words do cabecalho: source address e destination address,
 	#alem de options e padding
 	pkg.write(src)
 	pkg.write(dst)
 	pkg.write(opt)
+	for i in range(pad):
+		pkg.write(struct.pack("B", 0))
 
 	#atualiza o ultimo numero de sequencia do daemon
 	daemons["seq"][num] += 1
+
+	pkg.seek(0)
+	aux = struct.unpack("IIIII", pkg.read(20))
+	for a in aux:
+		print(hex(a))
 
 	return pkg
 
