@@ -10,20 +10,28 @@ daemons = {
 	"seq": [0, 0, 0]
 }
 
-#funcao placeholder, retorna 0 ate ser implementada
-def computeChecksum(wordLen, identification, prt, src, dst, opt):
-	checksum = (2 << 12) | (wordLen << 8)
+def computeChecksum(wordLen, identification, prt, src, dst, opt, chk = 0):
+	checksum = chk
+	checksum += (2 << 12) | (wordLen << 8)
 	checksum += wordLen * 4
 	checksum += identification
 	checksum += 7 << 13
 	checksum += (64 << 8) | prt
-	source = struct.unpack("!HH", src)
-	dest = struct.unpack("!HH", dst)
-	checksum += source[0] + source[1]
-	checksum += dest[0] + dest[1]
+	source = struct.unpack("!I", src)
+	dest = struct.unpack("!I", dst)
+	checksum += (source[0] >> 16) + (source[0] & 0xFFFF)
+	checksum += (dest[0] >> 16) + (dest[0] & 0xFFFF)
 
+	flag = True
+	partialsum = 0
 	for c in opt:
-		checksum += int(hex(c))
+		flag = not flag
+		if flag:
+			partialsum += ord(c)
+			checksum += partialsum
+			partialsum = 0
+		else:
+			partialsum = ord(c) << 8
 	
 	checksum = (checksum & 0xFFFF) + (checksum >> 32)
 	checksum = (checksum ^ 0xFFFF)
@@ -103,8 +111,16 @@ def executeCommands(commands, num):
 		pkg = createPackage(c[0], c[1], num, source, destination)
 		pkg.seek(0)
 		clientSocket.send(pkg.read())
-		#o = clientSocket.recv(2048)
-		#outputs.append(o)
+
+		#recupera a resposta do daemon
+		pkg = io.BytesIO(clientSocket.recv(2048))
+
+		pkg.seek(0, 2)
+		outputLen = pkg.tell() - 20
+
+		pkg.seek(20)
+		o = struct.unpack("s" * outputLen, pkg.read())
+		outputs.append("".join(o))
 
 		clientSocket.close()
 
