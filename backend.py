@@ -11,8 +11,24 @@ daemons = {
 }
 
 #funcao placeholder, retorna 0 ate ser implementada
-def computeChecksum():
-	return 0
+def computeChecksum(wordLen, identification, prt, src, dst, opt):
+	checksum = (2 << 12) | (wordLen << 8)
+	checksum += wordLen * 4
+	checksum += identification
+	checksum += 7 << 13
+	checksum += (64 << 8) | prt
+	source = struct.unpack("!HH", src)
+	dest = struct.unpack("!HH", dst)
+	checksum += source[0] + source[1]
+	checksum += dest[0] + dest[1]
+
+	for c in opt:
+		checksum += int(hex(c))
+	
+	checksum = (checksum & 0xFFFF) + (checksum >> 32)
+	checksum = (checksum ^ 0xFFFF)
+
+	return checksum
 
 def createPackage(prt, opt, num, src, dst):
 	
@@ -29,23 +45,22 @@ def createPackage(prt, opt, num, src, dst):
 	wordLen += 5
 
 	optionsLen = len(opt)
+	checksum = computeChecksum(wordLen, daemons["seq"][num], prt, src, dst, opt)
 
 	#instancia o stream de bytes 
 	pkg = io.BytesIO()
 
 	#primeira word do cabecalho: version, IHL, Type of Service e Total Length
-	pkg.write(struct.pack("B", (2 << 4 | wordLen))
-	pkg.write(struct.pack("B", 0)
-	pkg.write(struct.pack("H", wordLen * 4))
+	word = (2 << 28) | (wordLen << 24) | (wordLen * 4)
+	pkg.write(struct.pack("!I", word))
 
 	#segunda word do cabecalho: identification, flags, fragment offset
-	pkg.write(struct.pack("H", daemons["seq"][num]))
-	pkg.write(struct.pack("H", 7 << 13))
+	word = (daemons["seq"][num] << 16) | (7 << 13)
+	pkg.write(struct.pack("!I", word))
 
 	#terceira word do cabecalho: timeToLive, protocol, headerChecksum iniciado com 0
-	pkg.write(struct.pack("B", 64))
-	pkg.write(struct.pack("B", prt))
-	pkg.write(struct.pack("H", computeChecksum())
+	word = (64 << 24) | (prt << 16) | checksum
+	pkg.write(struct.pack("!I", word))
 
 	#quarta e quinta words do cabecalho: source address e destination address,
 	#alem de options e padding
@@ -59,7 +74,7 @@ def createPackage(prt, opt, num, src, dst):
 	daemons["seq"][num] += 1
 
 	pkg.seek(0)
-	aux = struct.unpack("IIIII", pkg.read(20))
+	aux = struct.unpack("!IIIII", pkg.read(20))
 	for a in aux:
 		print(hex(a))
 
@@ -81,6 +96,7 @@ def executeCommands(commands, num):
 		#define o endereco de origem e destino do pacote
 		#no caso deste trabalho, ambos sao equivalentes
 		source = inet_aton(gethostbyname(gethostname()))
+		print("source: " + str(gethostbyname(gethostname())))
 		destination = inet_aton(daemons["ip"][num])
 
 		#envia o pacote para o daemon e aguarda o retorno
