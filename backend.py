@@ -83,8 +83,8 @@ def createPackage(prt, opt, num, src, dst):
 
 	pkg.seek(0)
 	aux = struct.unpack("!IIIII", pkg.read(20))
-	for a in aux:
-		print(hex(a))
+	#for a in aux:
+		#print(hex(a))
 
 	return pkg
 
@@ -104,7 +104,7 @@ def executeCommands(commands, num):
 		#define o endereco de origem e destino do pacote
 		#no caso deste trabalho, ambos sao equivalentes
 		source = inet_aton(gethostbyname(gethostname()))
-		print("source: " + str(gethostbyname(gethostname())))
+		#print("source: " + str(gethostbyname(gethostname())))
 		destination = inet_aton(daemons["ip"][num])
 
 		#envia o pacote para o daemon e aguarda o retorno
@@ -112,8 +112,8 @@ def executeCommands(commands, num):
 		pkg.seek(0)
 		clientSocket.send(pkg.read())
 
-		#recupera a resposta do daemon
-		pkg = io.BytesIO(clientSocket.recv(2048))
+		#recupera o pacote de resposta do daemon
+		pkg = io.BytesIO(clientSocket.recv(10240))
 
 		pkg.seek(0, 2)
 		outputLen = pkg.tell() - 20

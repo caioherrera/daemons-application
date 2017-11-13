@@ -10,7 +10,7 @@ commands = ["ps", "df", "finger", "uptime"]
 
 def computeChecksum(headerLen, totalLen, identification, prt, source, dest, opt, chk = 0):
 	checksum = chk
-	checksum += (2 << 12) | headerLen << 8
+	checksum += (2 << 12) | (headerLen << 8)
 	checksum += totalLen * 4
 	checksum += identification
 	checksum += 7 << 13
@@ -59,9 +59,13 @@ class CommandExecution(threading.Thread):
 
 		#obtem comando pelo campo protocol
 		command = commands[((header[2] >> 16) & 0xFF) - 1]
-		command += options		
-		print(command)
-
+		for o in options:
+			if o != '\0':
+				command += o		
+		#print(command)
+		print(len(command))
+		print(len(options))
+		
 		#verifica se e seguro executar o comando
 		output = ""
 		dangerous = set(";>|")
@@ -73,34 +77,36 @@ class CommandExecution(threading.Thread):
 				output = subprocess.check_output(command.split(" "), stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as e:
 				output = e.output
-		print("Output: " + output)
+		print(output)
 		
-		#modifica cabecalho do pacote para retornar
+		#calcula quantidade de words necessarias
 		outputLen = len(output) // 4
 		if len(output) % 4 > 0:
 			outputLen += 1
 
+		#define o header do pacote a ser enviado
 		newHeader = []
 		newHeader.append((header[0] & 0xF0FF0000) | (5 << 24) | (20 + outputLen * 4))
 		newHeader.append(header[1] & 0xFFFF0FFF)
 		newHeader.append(header[2] - 0x01000000)
 		newHeader.append(header[4])
 		newHeader.append(header[3])
-		chk = computeChecksum(5, outputLen, newHeader[1] >> 16, (newHeader[2] >> 16) & 0x00FF, newHeader[3], newHeader[4], output)
+		chk = computeChecksum(5, 20 + outputLen * 4, newHeader[1] >> 16, (newHeader[2] >> 16) & 0x00FF, newHeader[3], newHeader[4], output)
 		newHeader[2] = newHeader[2] | chk
 
+		#prepara e envia o pacote
 		pkg = io.BytesIO()
 		for h in header:
 			pkg.write(struct.pack("!I", h))
 		pkg.write(output)
 		
 		#retorna para o socket cliente o output do comando
-		#apos isso, encerra a conexao
 		pkg.seek(0)
 		self.socket.send(pkg.read())
+	
+		#apos isso, encerra a conexao
 		self.socket.close()
 		
-
 #verifica se os argumentos foram passados corretamente
 if len(sys.argv) != 3 or sys.argv[1] != "--port":
 	print("Uso: ./daemon.py --port PORT")
