@@ -34,6 +34,18 @@ def computeChecksum(headerLen, totalLen, identification, prt, source, dest, opt,
 
 	return checksum
 
+def verifyChecksum(header, options):
+	headerLen = (header[0] >> 24) & 0xF
+	totalLen = header[0] & 0xFFFF
+	identification = (header[1] >> 16)
+	prt = (header[2] >> 16) & 0xFF
+	source = header[3]
+	dest = header[4]
+	opt = options
+	chk = header[2] && 0xFFFF
+	computedCHK = computeChecksum(headerLen, totalLen, identification, prt, source, dest, opt, chk)
+	return computedCHK == 0
+
 #definicao de uma classe filha de threading.Thread
 #para a utilizacao de paralelismo
 class CommandExecution(threading.Thread):
@@ -49,7 +61,7 @@ class CommandExecution(threading.Thread):
 		#recebe e decodifica o pacote
 		package = io.BytesIO(self.socket.recv(2048))
 		package.seek(0)
-		header = struct.unpack("!IIIII", package.read(20))
+		header = struct.unpack("!IIIII", package.read(20))	
 
 		#obtem as options associadas ao comando
 		package.seek(20)
@@ -63,20 +75,24 @@ class CommandExecution(threading.Thread):
 			if o != '\0':
 				command += o		
 		#print(command)
-		print(len(command))
-		print(len(options))
+		#print(len(command))
+		#print(len(options))
 		
-		#verifica se e seguro executar o comando
 		output = ""
-		dangerous = set(";>|")
-		if any((c in dangerous) for c in options):
-			output = "Erro: parametro malicioso!"
+		#verifica se o checksum do pacote esta correto
+		if not verifyChecksum(header, options):
+			output = "Erro: pacote corrompido!"
 		else:
-			#tenta executar o comando e obter seu output
-			try:
-				output = subprocess.check_output(command.split(" "), stderr=subprocess.STDOUT)
-			except subprocess.CalledProcessError as e:
-				output = e.output
+			#verifica se e seguro executar o comando
+			dangerous = set(";>|")
+			if any((c in dangerous) for c in options):
+				output = "Erro: parametro malicioso!"
+			else:
+				#tenta executar o comando e obter seu output
+				try:
+					output = subprocess.check_output(command.split(" "), stderr=subprocess.STDOUT)
+				except subprocess.CalledProcessError as e:
+					output = e.output
 		print(output)
 		
 		#calcula quantidade de words necessarias
